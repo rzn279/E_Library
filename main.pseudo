@@ -1,0 +1,1079 @@
+ALGORITMA Sistem_E-Library
+
+// pendeklatasian struck user untuk menyimpan data-data user
+STRUCT User
+    username: STRING
+    password: STRING
+    role: STRING
+    buku_dipinjam: VECTOR OF BukuDiPinjam
+    denda: DOUBLE
+END STRUCT
+
+// pendeklarasian BukuDiPinjam untuk menyimpan data buku yang dipinjam user
+STRUCT BukuDiPinjam
+    id: INTEGER
+    judul: STRING
+    author: STRING
+    tanggal_pinjam: STRING
+    tanggal_kembali: STRING
+END STRUCT
+
+// pendeklarasian struct buku untuk menyimpan data-data buku
+STRUCT Buku
+    id: INTEGER
+    judul: STRING
+    author: STRING
+    isbn: STRING
+    tahun: INTEGER
+    path: STRING
+    stock_baca: INTEGER
+    stock_jual: INTEGER
+    harga: DOUBLE
+END STRUCT
+
+STRUCT Transaksi
+    tanggal: STRING
+    kategori: STRING
+    jumlah: DOUBLE
+    deskripsi: STRING
+END STRUCT
+
+// pendefinisian fungsi/prosedur
+DECLARE PROCEDURE bersihkanLayar()
+DECLARE FUNCTION dataUserJson() RETURNS JSON
+DECLARE PROCEDURE updateDataUser(REF data_user: VECTOR OF User)
+DECLARE FUNCTION dataBukuJson() RETURNS JSON
+DECLARE PROCEDURE updateDataBuku(REF data_buku: VECTOR OF Buku)
+DECLARE PROCEDURE updateDataKeuangan(REF data_keuangan: VECTOR OF Transaksi)
+DECLARE FUNCTION login(REF data_user: VECTOR OF User) RETURNS User
+DECLARE PROCEDURE signUp(REF data_user: VECTOR OF User)
+DECLARE PROCEDURE tampilkanBuku(REF data_buku: VECTOR OF Buku)
+DECLARE PROCEDURE tambahBuku(REF data_buku: VECTOR OF Buku)
+DECLARE PROCEDURE ubahDataBuku(REF data_buku: VECTOR OF Buku)
+DECLARE PROCEDURE hapusDataBuku(REF data_buku: VECTOR OF Buku)
+DECLARE PROCEDURE tampilkanDataUser(REF data_user: VECTOR OF User)
+DECLARE PROCEDURE tampilkanBukuUser(REF data_buku: VECTOR OF Buku)
+DECLARE PROCEDURE laporanKeuangan(data_transaksi: VECTOR OF Transaksi)
+DECLARE PROCEDURE bacaBuku(REF data_buku: VECTOR OF Buku)
+DECLARE PROCEDURE pinjamBuku(REF data_buku: VECTOR OF Buku, REF data_user: VECTOR OF User, username: STRING, REF buku_dipinjam: VECTOR OF BukuDiPinjam)
+DECLARE FUNCTION stringKeTimeT(tanggal: STRING) RETURNS TIME_T
+DECLARE PROCEDURE tampilkanBukuDipinjam(REF data_user: VECTOR OF User, username: STRING)
+DECLARE PROCEDURE kembalikanBuku(REF data_buku: VECTOR OF Buku, REF data_user: VECTOR OF User, username: STRING)
+DECLARE PROCEDURE simpanTransaksiCSV(tanggal: STRING, kategori: STRING, jumlah: DOUBLE, deskripsi: STRING)
+DECLARE PROCEDURE beliBuku(REF data_buku: VECTOR OF Buku, username: STRING)
+DECLARE PROCEDURE berandaAdmin(REF data_buku: VECTOR OF Buku, REF data_user: VECTOR OF User, REF data_transaksi: VECTOR OF Transaksi)
+DECLARE PROCEDURE berandaUser(REF data_buku: VECTOR OF Buku, REF data_user: VECTOR OF User, username: STRING, REF buku_dipinjam: VECTOR OF BukuDiPinjam)
+
+FUNCTION MAIN 
+    // fungsi main berisi alur program utama
+    bersihkanLayar()
+    DECLARE opsi: INTEGER
+    DECLARE role: STRING
+    DECLARE data_user: VECTOR OF User
+    DECLARE data_buku: VECTOR OF Buku
+    DECLARE buku_dipinjam: VECTOR OF BukuDiPinjam
+    DECLARE data_transaksi: VECTOR OF Transaksi
+    DECLARE user: User
+    
+    dataUserJson()
+    updateDataUser(data_user)
+    dataBukuJson()
+    updateDataBuku(data_buku)
+    updateDataKeuangan(data_transaksi)
+
+    PRINT "========== Program E-Library =========="
+    PRINT "1. Login"
+    PRINT "2. Signup"
+    PRINT "Pilih opsi (1/2) : "
+    
+    DO
+        READ opsi
+    WHILE (opsi > 2 OR opsi < 1)
+    
+    IF opsi == 1 THEN
+        user = login(data_user)
+    ELSE
+        signUp(data_user)
+        updateDataUser(data_user)
+        PRINT NEWLINE
+        user = login(data_user)
+    END IF
+    
+    PRINT user.username + " " + user.role
+    
+    IF user.role == "admin" THEN
+        berandaAdmin(data_buku, data_user, data_transaksi)
+    ELSE
+        berandaUser(data_buku, data_user, user.username, buku_dipinjam)
+    END IF
+
+    RETURN 0
+
+END MAIN PROGRAM
+
+PROCEDURE bersihkanLayar()
+    // prosedur bersihkanLayar digunakan untuk membersihkan tampilan layar terminal
+    #ifdef _WIN32
+        system("cls")
+    #elif __linux__ OR _APPLE_
+        system("clear")
+    #else
+        RETURN
+    #endif
+END PROCEDURE
+
+FUNCTION dataUserJson() RETURNS JSON
+    // fungsi dataUserJson berfungsi untuk mengambil data-data yang ada di dalam file user.json ke json user
+    DECLARE file_user: FILE = OPEN("data_user.json")
+    IF NOT file_user.is_open() THEN
+        PRINT "Error: Tidak dapat memuat file data_user.json"
+        RETURN NULL
+    END IF
+    
+    DECLARE user: JSON
+    READ file_user TO user
+    CLOSE file_user
+    RETURN user
+END FUNCTION
+
+PROCEDURE updateDataUser(REF data_user: VECTOR OF User)
+    // prosedur updateDataUser berfungsi untuk memperbarui data user dari file json ke dalam vector data_user
+    DECLARE user: JSON = dataUserJson()
+    CLEAR data_user
+    
+    FOR EACH usrJson IN user["User"] DO
+        DECLARE usr: User
+        usr.username = usrJson["username"]
+        usr.password = usrJson["password"]
+        usr.role = usrJson["role"]
+        usr.denda = usrJson["denda"]
+        CLEAR usr.buku_dipinjam
+        
+        FOR EACH bukuJson IN usrJson["buku_dipinjam"] DO
+            DECLARE buku: BukuDiPinjam
+            buku.id = bukuJson["id"]
+            buku.judul = bukuJson["judul"]
+            buku.author = bukuJson["author"]
+            buku.tanggal_pinjam = bukuJson["tanggal_pinjam"]
+            buku.tanggal_kembali = bukuJson["tanggal_kembali"]
+            APPEND buku TO usr.buku_dipinjam
+        END FOR
+        
+        APPEND usr TO data_user
+    END FOR
+END PROCEDURE
+
+PROCEDURE simpanDataUser(data_user: VECTOR OF User)
+    // prosedur simpanDataUser digunakan untuk menyimpan data user ke dalam file data_user.json
+    DECLARE user: JSON
+    
+    FOR EACH u IN data_user DO
+        DECLARE dipinjam: JSON = EMPTY_ARRAY
+        
+        FOR EACH b IN u.buku_dipinjam DO
+            APPEND TO dipinjam: {
+                "id": b.id,
+                "judul": b.judul,
+                "author": b.author,
+                "tanggal_pinjam": b.tanggal_pinjam,
+                "tanggal_kembali": b.tanggal_kembali
+            }
+        END FOR
+        
+        APPEND TO user["User"]: {
+            "username": u.username,
+            "password": u.password,
+            "role": u.role,
+            "buku_dipinjam": dipinjam,
+            "denda": u.denda
+        }
+    END FOR
+    
+    DECLARE write_data_user: FILE = OPEN("data_user.json")
+    IF NOT write_data_user THEN
+        PRINT "Error: Tidak dapat memuat file data_user.json"
+        RETURN
+    END IF
+    
+    WRITE user TO write_data_user
+END PROCEDURE
+
+FUNCTION dataBukuJson() RETURNS JSON
+    // fungsi dataBukuJson berfungsi untuk mengambil data-data yang ada di dalam file data_buku.json ke json data
+    DECLARE file_data_buku: FILE = OPEN("data_buku.json")
+    IF NOT file_data_buku.is_open() THEN
+        PRINT "Error: Tidak dapat memuat file data_buku.json"
+        RETURN NULL
+    END IF
+    
+    DECLARE data: JSON
+    READ file_data_buku TO data
+    CLOSE file_data_buku
+    RETURN data
+END FUNCTION
+
+PROCEDURE updateDataBuku(REF data_buku: VECTOR OF Buku)
+    // prosedur updateDataBuku berfungsi untuk memperbarui data buku dari file json ke dalam vector data_buku
+    DECLARE data: JSON = dataBukuJson()
+    CLEAR data_buku
+    
+    FOR EACH item IN data["Buku"] DO
+        DECLARE buku: Buku
+        buku.id = item["id"]
+        buku.judul = item["judul"]
+        buku.author = item["author"]
+        buku.isbn = item["isbn"]
+        buku.tahun = item["tahun"]
+        buku.path = item["path"]
+        buku.stock_baca = item["stock_baca"]
+        buku.stock_jual = item["stock_jual"]
+        buku.harga = item["harga"]
+        APPEND buku TO data_buku
+    END FOR
+END PROCEDURE
+
+PROCEDURE simpanDataBuku(data_buku: VECTOR OF Buku)
+    // prosedur simpanDataBuku digunakan untuk menyimpan data buku ke dalam file data_buku.json
+    DECLARE data: JSON
+    
+    FOR EACH buku IN data_buku DO
+        APPEND TO data["Buku"]: {
+            "id": buku.id,
+            "judul": buku.judul,
+            "author": buku.author,
+            "isbn": buku.isbn,
+            "tahun": buku.tahun,
+            "path": buku.path,
+            "stock_baca": buku.stock_baca,
+            "stock_jual": buku.stock_jual,
+            "harga": buku.harga
+        }
+    END FOR
+    
+    DECLARE write_data_buku: FILE = OPEN("data_buku.json")
+    IF NOT write_data_buku THEN
+        PRINT "Error: Tidak dapat memuat file data_buku.json"
+        RETURN
+    END IF
+    
+    WRITE data TO write_data_buku
+END PROCEDURE
+
+PROCEDURE updateDataKeuangan(REF data_keuangan: VECTOR OF Transaksi)
+    CLEAR data_keuangan
+    DECLARE file: FILE = OPEN("laporan_keuangan.csv")
+    
+    IF NOT file.is_open() THEN
+        PRINT "Error : Tidak dapat membuka file"
+        RETURN
+    END IF
+    
+    DECLARE baris: STRING
+    READ_LINE file TO baris // lewati baris header
+    
+    WHILE READ_LINE file TO baris DO
+        DECLARE t: Transaksi
+        DECLARE temp: STRING
+        
+        PARSE baris BY ',' INTO t.tanggal, t.kategori, temp, t.deskripsi
+        t.jumlah = CONVERT temp TO DOUBLE
+        
+        APPEND t TO data_keuangan
+    END WHILE
+    
+    CLOSE file
+    RETURN
+END PROCEDURE
+
+FUNCTION login(REF data_user: VECTOR OF User) RETURNS User
+    // fungsi logi untuk memvalidasi login user
+    bersihkanLayar()
+    updateDataUser(data_user)
+    
+    WHILE TRUE DO
+        DECLARE input_username: STRING
+        DECLARE input_passwd: STRING
+        
+        PRINT "Masukan username anda : "
+        READ input_username
+        PRINT "Masukan password anda : "
+        READ input_passwd
+        
+        FOR EACH user IN data_user DO
+            IF (input_username == user.username) AND (input_passwd == user.password) THEN
+                PRINT "login berhasil"
+                RETURN user
+            END IF
+        END FOR
+        
+        PRINT "username atau password salah, silahkan coba lagi"
+    END WHILE
+END FUNCTION
+
+PROCEDURE signUp(REF data_user: VECTOR OF User)
+    // prosedur singUp untuk menambah data user baru
+    bersihkanLayar()
+    DECLARE input_username: STRING
+    DECLARE input_passwd: STRING
+    
+    // menginput username serta mengecek apakah username sudah digunakan
+    WHILE TRUE DO
+        DECLARE valid: BOOLEAN = FALSE
+        PRINT "Buat username anda : "
+        READ input_username
+        
+        FOR EACH user IN data_user DO
+            IF user.username == input_username THEN
+                PRINT "Username telah digunakan !, tolong gunakan username lain"
+                valid = TRUE
+                BREAK
+            END IF
+        END FOR
+        
+        IF NOT valid THEN
+            BREAK
+        END IF
+    END WHILE
+    
+    // menginput password dengan minimal 8 karakter
+    WHILE LENGTH(input_passwd) < 8 DO
+        PRINT "Buat password anda (minimal 8 karakter) : "
+        READ input_passwd
+    END WHILE
+    
+    // memperbarui data user di file
+    DECLARE user_baru: User
+    user_baru.username = input_username
+    user_baru.password = input_passwd
+    user_baru.role = "user"
+    user_baru.buku_dipinjam = EMPTY_VECTOR
+    user_baru.denda = 0.0
+    
+    APPEND user_baru TO data_user
+    simpanDataUser(data_user)
+    PRINT "user berhasil dibuat !"
+    PRINT "(Tekan Enter untuk login)"
+    READ
+    updateDataUser(data_user)
+END PROCEDURE
+
+PROCEDURE berandaAdmin(REF data_buku: VECTOR OF Buku, REF data_user: VECTOR OF User, REF data_transaksi: VECTOR OF Transaksi)
+    bersihkanLayar()
+    DECLARE opsi: INTEGER
+    
+    DO
+        PRINT "====================== Beranda Admin ======================"
+        PRINT "1. Tambah buku    2. Lihat semua buku    3. Edit data buku"
+        PRINT "4. Hapus buku     5. Lihat data user     6. Laporan keuangan"
+        PRINT "7. Exit"
+        PRINT "==========================================================="
+        PRINT "Pilih opsi (1-7) : "
+        READ opsi
+        
+        WHILE (opsi > 7 OR opsi < 1)
+            PRINT "Opsi tidak valid, silahkan pilih opsi (1-7) : "
+            READ opsi
+        END WHILE
+        
+        SWITCH opsi
+            CASE 1:
+                tambahBuku(data_buku)
+            CASE 2:
+                tampilkanBuku(data_buku)
+            CASE 3:
+                ubahDataBuku(data_buku)
+            CASE 4:
+                hapusDataBuku(data_buku)
+            CASE 5:
+                tampilkanDataUser(data_user)
+            CASE 6:
+                laporanKeuangan(data_transaksi)
+            CASE 7:
+                PRINT "Keluar dari program...."
+            DEFAULT:
+                PRINT "Opsi tidak valid"
+        END SWITCH
+    WHILE (opsi != 7)
+END PROCEDURE
+
+PROCEDURE berandaUser(REF data_buku: VECTOR OF Buku, REF data_user: VECTOR OF User, username: STRING, REF buku_dipinjam: VECTOR OF BukuDiPinjam)
+    bersihkanLayar()
+    DECLARE opsi: INTEGER
+    
+    DO
+        PRINT "================= Program E-Library =================="
+        PRINT "  Akun : " + username
+        tampilkanBukuUser(data_buku)
+        PRINT "======================================================"
+        PRINT "1. Baca buku    2. Pinjam buku    3. Kembalikan buku"
+        PRINT "4. Beli Buku    5. Exit"
+        PRINT "======================================================"
+        
+        DO
+            PRINT "Pilih opsi (1-5) : "
+            READ opsi
+        WHILE (opsi < 1 OR opsi > 6)
+        
+        SWITCH opsi
+            CASE 1:
+                bacaBuku(data_buku)
+            CASE 2:
+                pinjamBuku(data_buku, data_user, username, buku_dipinjam)
+            CASE 3:
+                kembalikanBuku(data_buku, data_user, username)
+            CASE 4:
+                beliBuku(data_buku, username)
+            CASE 5:
+                PRINT "Keluar dari program...."
+            DEFAULT:
+                PRINT "Opsi tidak valid"
+        END SWITCH
+    WHILE (opsi != 5)
+END PROCEDURE
+
+PROCEDURE tampilkanBuku(REF data_buku: VECTOR OF Buku)
+    // prosedur untuk menampilkan buku_buku untuk admin
+    bersihkanLayar()
+    updateDataBuku(data_buku)
+    
+    PRINT "================== DAFTAR BUKU =========================="
+    FOR EACH buku IN data_buku DO
+        PRINT "[" + buku.id + "] " + buku.judul
+        PRINT "    Author        : " + buku.author
+        PRINT "    Tahun Terbit  : " + buku.tahun
+        PRINT "    Harga         : Rp " + buku.harga
+        PRINT "    Stock Baca    : " + buku.stock_baca
+        PRINT "    Stock Jual    : " + buku.stock_jual
+        PRINT "    ISBN          : " + buku.isbn
+        PRINT "    Path File     : " + buku.path
+        PRINT "-----------------------------------------------------------"
+    END FOR
+END PROCEDURE
+
+PROCEDURE tambahBuku(REF data_buku: VECTOR OF Buku)
+    // prosedur untuk menambahkan buku baru
+    DECLARE buku_baru: Buku
+    DECLARE konfirmasi: CHARACTER = 'n'
+    DECLARE create_data: BOOLEAN = TRUE
+    DECLARE data: JSON = dataBukuJson()
+    DECLARE jumlah_buku: INTEGER = LENGTH(data_buku)
+    
+    bersihkanLayar()
+    
+    WHILE create_data DO
+        DECLARE tambah_data: BOOLEAN = TRUE
+        
+        WHILE tambah_data DO
+            buku_baru.id = ++jumlah_buku
+            PRINT "Input judul buku : "
+            READ buku_baru.judul
+            PRINT "Input nama author buku : "
+            READ buku_baru.author
+            PRINT "Input kode ISBN buku : "
+            READ buku_baru.isbn
+            PRINT "Input tahun rilis buku : "
+            READ buku_baru.tahun
+            PRINT "Input path lokasi buku : "
+            READ buku_baru.path
+            PRINT "Input jumlah stock baca : "
+            READ buku_baru.stock_baca
+            PRINT "Input jumlah stock jual : "
+            READ buku_baru.stock_jual
+            PRINT "Input harga buku : Rp "
+            READ buku_baru.harga
+            
+            DO
+                PRINT "Apakah data sudah benar ? (y/n) : "
+                READ konfirmasi
+            WHILE (LOWER(konfirmasi) != 'y' AND LOWER(konfirmasi) != 'n')
+            
+            IF LOWER(konfirmasi) == 'y' THEN
+                tambah_data = FALSE
+            END IF
+        END WHILE
+        
+        APPEND TO data["Buku"]: {
+            "id": buku_baru.id,
+            "judul": buku_baru.judul,
+            "author": buku_baru.author,
+            "isbn": buku_baru.isbn,
+            "tahun": buku_baru.tahun,
+            "path": buku_baru.path,
+            "stock_baca": buku_baru.stock_baca,
+            "stock_jual": buku_baru.stock_jual,
+            "harga": buku_baru.harga
+        }
+        
+        DECLARE write_data_buku: FILE = OPEN("data_buku.json")
+        IF NOT write_data_buku THEN
+            PRINT "Gagal memuat file !"
+            RETURN
+        END IF
+        
+        WRITE data TO write_data_buku
+        CLOSE write_data_buku
+        PRINT "Berhasil menambahkan data !."
+        
+        WHILE TRUE DO
+            PRINT "Ingin lanjut menambahkan data ? (y/n) : "
+            READ konfirmasi
+            IF LOWER(konfirmasi) == 'y' THEN
+                BREAK
+            ELSE
+                create_data = FALSE
+                bersihkanLayar()
+                BREAK
+            END IF
+        END WHILE
+    END WHILE
+    
+    updateDataBuku(data_buku)
+END PROCEDURE
+
+PROCEDURE ubahDataBuku(REF data_buku: VECTOR OF Buku)
+    // prosedur untuk merubah data buku
+    DECLARE data: JSON = dataBukuJson()
+    DECLARE id: INTEGER
+    DECLARE konfirmasi: CHARACTER
+    DECLARE update_data: BOOLEAN = TRUE
+    DECLARE temp: STRING
+    DECLARE range_id: INTEGER = LENGTH(data_buku)
+    
+    bersihkanLayar()
+    
+    WHILE update_data DO
+        tampilkanBuku(data_buku)
+        DECLARE ubah_data: BOOLEAN = TRUE
+        
+        DO
+            PRINT "Pilih data buku yang ingin diubah sesuai nomor : "
+            READ id
+        WHILE (id < 1 OR id > range_id)
+        
+        WHILE ubah_data DO
+            FOR EACH buku IN data["Buku"] DO
+                IF buku["id"] == id THEN
+                    PRINT "Mengubah data buku nomor = " + id
+                    PRINT "Input judul buku : "
+                    READ temp
+                    buku["judul"] = temp
+                    PRINT "Input nama author buku : "
+                    READ temp
+                    buku["author"] = temp
+                    PRINT "Input kode ISBN buku : "
+                    READ temp
+                    buku["isbn"] = temp
+                    PRINT "Input tahun rilis buku : "
+                    READ buku["tahun"]
+                    PRINT "Input path lokasi buku : "
+                    READ temp
+                    buku["path"] = temp
+                    PRINT "Input jumlah stock baca : "
+                    READ buku["stock_baca"]
+                    PRINT "Input jumlah stock jual : "
+                    READ buku["stock_jual"]
+                    PRINT "Input harga buku : Rp "
+                    READ buku["harga"]
+                    BREAK
+                END IF
+            END FOR
+            
+            DO
+                PRINT "Apakah data sudah benar ? (y/n) : "
+                READ konfirmasi
+            WHILE (LOWER(konfirmasi) != 'y' AND LOWER(konfirmasi) != 'n')
+            
+            IF LOWER(konfirmasi) == 'y' THEN
+                ubah_data = FALSE
+            END IF
+        END WHILE
+        
+        DECLARE write_data_buku: FILE = OPEN("data_buku.json")
+        IF NOT write_data_buku THEN
+            PRINT "Gagal memuat file !"
+            RETURN
+        END IF
+        
+        WRITE data TO write_data_buku
+        CLOSE write_data_buku
+        PRINT "Berhasil merubah data !."
+        
+        WHILE TRUE DO
+            PRINT "Ingin lanjut merubah data ? (y/n) : "
+            READ konfirmasi
+            IF LOWER(konfirmasi) == 'y' THEN
+                BREAK
+            ELSE
+                bersihkanLayar()
+                update_data = FALSE
+                BREAK
+            END IF
+        END WHILE
+    END WHILE
+    
+    updateDataBuku(data_buku)
+END PROCEDURE
+
+PROCEDURE hapusDataBuku(REF data_buku: VECTOR OF Buku)
+    // prosedur untuk menghapus data buku
+    DECLARE data: JSON = dataBukuJson()
+    DECLARE id: INTEGER
+    DECLARE konfirmasi: CHARACTER
+    
+    bersihkanLayar()
+    
+    WHILE TRUE DO
+        tampilkanBuku(data_buku)
+        
+        DO
+            PRINT "Pilih data buku yang ingin duhapus sesuai nomor : "
+            READ id
+        WHILE (id < 1 OR id > LENGTH(data_buku))
+        
+        DO
+            PRINT "Apakah anda yakin ingin menghapus buku ini ? (y/n) : "
+            READ konfirmasi
+        WHILE (LOWER(konfirmasi) != 'y' AND LOWER(konfirmasi) != 'n')
+        
+        IF LOWER(konfirmasi) == 'y' THEN
+            FOR i = 0 TO LENGTH(data["Buku"]) - 1 DO
+                IF data["Buku"][i]["id"] == id THEN
+                    REMOVE data["Buku"][i]
+                    BREAK
+                END IF
+            END FOR
+            
+            DECLARE id_baru: INTEGER = 1
+            FOR EACH buku IN data["Buku"] DO
+                buku["id"] = id_baru
+                id_baru = id_baru + 1
+            END FOR
+            
+            DECLARE write_data_buku: FILE = OPEN("data_buku.json")
+            IF NOT write_data_buku THEN
+                PRINT "Gagal memuat file !"
+                RETURN
+            END IF
+            
+            WRITE data TO write_data_buku
+            CLOSE write_data_buku
+            PRINT "Berhasil menghapus data !."
+        END IF
+        
+        DO
+            PRINT "Ingin lanjut merubah data ? (y/n) : "
+            READ konfirmasi
+        WHILE (LOWER(konfirmasi) != 'y' AND LOWER(konfirmasi) != 'n')
+        
+        IF LOWER(konfirmasi) == 'n' THEN
+            BREAK
+        END IF
+    END WHILE
+    
+    updateDataBuku(data_buku)
+END PROCEDURE
+
+PROCEDURE tampilkanDataUser(REF data_user: VECTOR OF User)
+    // prosedur untuk menampilkan data user
+    bersihkanLayar()
+    updateDataUser(data_user)
+    
+    PRINT "======================== Data User ========================"
+    PRINT "-----------------------------------------------------------"
+    
+    FOR EACH usr IN data_user DO
+        PRINT "Username : " + usr.username
+        PRINT "Password : " + usr.password
+        PRINT "Buku Dipinjam:"
+        
+        IF LENGTH(usr.buku_dipinjam) == 0 THEN
+            PRINT "  - Tidak ada buku yang dipinjam"
+        ELSE
+            FOR EACH buku IN usr.buku_dipinjam DO
+                PRINT "  ID Buku          : " + buku.id
+                PRINT "  Judul            : " + buku.judul
+                PRINT "  Author           : " + buku.author
+                PRINT "  Tanggal Pinjam   : " + buku.tanggal_pinjam
+                PRINT "  Tanggal Kembali  : " + buku.tanggal_kembali
+            END FOR
+            PRINT "-----------------------------------------------------------"
+        END IF
+        
+        PRINT "Denda : Rp " + usr.denda
+    END FOR
+    
+    PRINT "==========================================================="
+END PROCEDURE
+
+PROCEDURE laporanKeuangan(data_transaksi: VECTOR OF Transaksi)
+    bersihkanLayar()
+    updateDataKeuangan(data_transaksi)
+    
+    PRINT "====================================================================="
+    PRINT "  Tanggal  | Kategori  | Jumlah | deskripsi"
+    PRINT "====================================================================="
+    
+    FOR EACH t IN data_transaksi DO
+        PRINT t.tanggal + " | " + t.kategori + " | " + t.jumlah + " | " + t.deskripsi
+    END FOR
+    
+    PRINT "====================================================================="
+END PROCEDURE
+
+PROCEDURE tampilkanBukuUser(REF data_buku: VECTOR OF Buku)
+    // prosedur untuk menampilkan buku pada user biasa
+    updateDataBuku(data_buku)
+    
+    PRINT "==================== Daftar Buku ====================="
+    PRINT "------------------------------------------------------"
+    
+    FOR EACH buku IN data_buku DO
+        PRINT "[" + buku.id + "] " + buku.judul
+        PRINT "    Author : " + buku.author
+        PRINT "    Stock  : " + buku.stock_baca
+        PRINT "------------------------------------------------------"
+    END FOR
+END PROCEDURE
+
+PROCEDURE bacaBuku(REF data_buku: VECTOR OF Buku)
+    // prosedur untuk membuka buku
+    DECLARE id_buku: INTEGER
+    DECLARE path: STRING
+    
+    DO
+        PRINT "Input ID buku yang ingin dibaca: "
+        READ id_buku
+    WHILE (id_buku < 1 OR id_buku > LENGTH(data_buku))
+    
+    FOR EACH buku IN data_buku DO
+        IF buku.id == id_buku THEN
+            path = buku.path
+            BREAK
+        END IF
+    END FOR
+    
+    #ifdef _WIN32
+        DECLARE command: STRING = "start \"\" \"" + path + "\""
+    #elif __linux__
+        DECLARE command: STRING = "xdg-open " + path
+    #elif __APPLE__
+        DECLARE command: STRING = "open \"" + path + "\""
+    #else
+        PRINT "OS tidak didukung"
+        RETURN
+    #endif
+    
+    DECLARE result: INTEGER = system(command)
+    IF result != 0 THEN
+        PRINT "Gagal membuka file PDF"
+    END IF
+    
+    bersihkanLayar()
+END PROCEDURE
+
+PROCEDURE pinjamBuku(REF data_buku: VECTOR OF Buku, REF data_user: VECTOR OF User, username: STRING, REF buku_dipinjam: VECTOR OF BukuDiPinjam)
+    // prosedur untuk meminjam buku
+    DECLARE id: INTEGER
+    DECLARE data: JSON
+    DECLARE user: JSON
+    DECLARE buku_pinjam: BukuDiPinjam
+    DECLARE sekarang: TIME = CURRENT_TIME()
+    DECLARE kembali: TIME = sekarang + (7 * 24 * 60 * 60)
+    DECLARE tgl_sekarang: STRING = FORMAT_DATE(sekarang, "%d-%m-%Y")
+    DECLARE tgl_kembali: STRING = FORMAT_DATE(kembali, "%d-%m-%Y")
+    
+    bersihkanLayar()
+    tampilkanBukuUser(data_buku)
+    
+    FOR EACH usr IN data_user DO
+        IF usr.username == username THEN
+            IF LENGTH(usr.buku_dipinjam) >= 2 THEN
+                PRINT "maaf, hanya dapat meminjam maksimal 2 buku"
+                RETURN
+            END IF
+        END IF
+    END FOR
+    
+    PRINT "Aturan meminjam buku :"
+    PRINT "1. Maksimal meminjam 2 buku"
+    PRINT "2. Waktu peminjaman selama 7 hari"
+    PRINT "3. Denda Rp 2000/hari jika terlambat mengembalikan buku"
+    
+    DO
+        PRINT "Input id buku yang ingin dipinjam : "
+        READ id
+    WHILE (id < 1 OR id > LENGTH(data_buku))
+    
+    FOR EACH buku IN data_buku DO
+        IF buku.id == id THEN
+            IF buku.stock_baca > 0 THEN
+                buku.stock_baca = buku.stock_baca - 1
+                buku_pinjam.id = buku.id
+                buku_pinjam.judul = buku.judul
+                buku_pinjam.author = buku.author
+                buku_pinjam.tanggal_pinjam = tgl_sekarang
+                buku_pinjam.tanggal_kembali = tgl_kembali
+                simpanDataBuku(data_buku)
+            ELSE
+                PRINT "maaf stock buku habis"
+            END IF
+            BREAK
+        END IF
+    END FOR
+    
+    FOR EACH usr IN data_user DO
+        IF usr.username == username THEN
+            APPEND buku_pinjam TO usr.buku_dipinjam
+            simpanDataUser(data_user)
+            PRINT "berhasil meminjam buku"
+        END IF
+    END FOR
+    
+    PRINT "(tekan Enter untuk lanjut)"
+    READ
+    updateDataUser(data_user)
+    updateDataBuku(data_buku)
+END PROCEDURE
+
+FUNCTION stringKeTimeT(tanggal: STRING) RETURNS TIME_T
+    // fungsi untuk mengkonversi string tanggal ke time_t
+    DECLARE hari: INTEGER = CONVERT SUBSTRING(tanggal, 0, 2) TO INTEGER
+    DECLARE bulan: INTEGER = CONVERT SUBSTRING(tanggal, 3, 2) TO INTEGER - 1
+    DECLARE tahun: INTEGER = CONVERT SUBSTRING(tanggal, 6, 4) TO INTEGER - 1900
+    
+    RETURN MAKE_TIME(hari, bulan, tahun, 0, 0, 0)
+END FUNCTION
+
+PROCEDURE tampilkanBukuDipinjam(REF data_user: VECTOR OF User, username: STRING)
+    updateDataUser(data_user)
+    
+    PRINT "================ Buku yang Dipinjam =================="
+    PRINT "------------------------------------------------------"
+    
+    FOR EACH usr IN data_user DO
+        IF usr.username == username THEN
+            FOR EACH buku IN usr.buku_dipinjam DO
+                PRINT "[" + buku.id + "] " + buku.judul
+                PRINT "    Author : " + buku.author
+                PRINT "    Tanggal pinjam  : " + buku.tanggal_pinjam
+                PRINT "    Tanggal kembali  : " + buku.tanggal_kembali
+                PRINT "------------------------------------------------------"
+            END FOR
+            PRINT "======================================================"
+        END IF
+    END FOR
+END PROCEDURE
+
+PROCEDURE kembalikanBuku(REF data_buku: VECTOR OF Buku, REF data_user: VECTOR OF User, username: STRING)
+    // proedur untuk mengembalikan buku
+    DECLARE i: INTEGER = 0
+    DECLARE id_buku: INTEGER
+    DECLARE kembalikan_buku: BOOLEAN = TRUE
+    DECLARE konfirmasi: CHARACTER
+    DECLARE denda: DOUBLE
+    DECLARE pembayaran: DOUBLE
+    DECLARE kembalian: DOUBLE
+    DECLARE sekarang: TIME = CURRENT_TIME()
+    DECLARE tgl_sekarang: STRING = FORMAT_DATE(sekarang, "%d-%m-%Y")
+    DECLARE pinjam: TIME_T
+    DECLARE kembali: TIME_T
+    
+    bersihkanLayar()
+    tampilkanBukuDipinjam(data_user, username)
+    PRINT "Tanggal hari ini : " + tgl_sekarang
+    
+    WHILE kembalikan_buku DO
+        PRINT "Input Id buku yang ingin dikembalikan : "
+        READ id_buku
+        
+        FOR EACH usr IN data_user DO
+            IF usr.username == username THEN
+                FOR EACH buku IN usr.buku_dipinjam DO
+                    IF buku.id == id_buku THEN
+                        pinjam = stringKeTimeT(buku.tanggal_pinjam)
+                        kembali = stringKeTimeT(buku.tanggal_kembali)
+                        DECLARE selisih_detik: DOUBLE = DIFFERENCE_TIME(sekarang, kembali)
+                        DECLARE selisih_hari: INTEGER = selisih_detik / (60 * 60 * 24)
+                        
+                        IF selisih_hari <= 0 THEN
+                            FOR EACH b IN data_buku DO
+                                IF b.id == id_buku THEN
+                                    b.stock_baca = b.stock_baca + 1
+                                    simpanDataBuku(data_buku)
+                                    BREAK
+                                END IF
+                            END FOR
+                            
+                            FOR EACH u IN data_user DO
+                                IF u.username == username THEN
+                                    DECLARE idx: INTEGER = 0
+                                    FOR EACH b IN u.buku_dipinjam DO
+                                        IF b.id == id_buku THEN
+                                            REMOVE u.buku_dipinjam[idx]
+                                            BREAK
+                                        END IF
+                                        idx = idx + 1
+                                    END FOR
+                                    u.denda = 0.0
+                                    simpanDataUser(data_user)
+                                    BREAK
+                                END IF
+                            END FOR
+                            
+                            PRINT "berhasil mengembalikan buku"
+                            kembalikan_buku = FALSE
+                        ELSE
+                            PRINT "Terlambat " + selisih_hari + " hari"
+                            denda = selisih_hari * 2000
+                            PRINT "Denda: Rp " + denda
+                            PRINT "Apakah anda ingin membayar denda sekarang ? (y/n) : "
+                            
+                            DO
+                                READ konfirmasi
+                            WHILE (konfirmasi != 'y' AND konfirmasi != 'n')
+                            
+                            IF konfirmasi == 'y' THEN
+                                WHILE TRUE DO
+                                    PRINT "Masukan jumlah pembayaran : Rp "
+                                    READ pembayaran
+                                    
+                                    IF pembayaran >= denda THEN
+                                        kembalian = pembayaran - denda
+                                        PRINT "Pembayaran berhasil. Kembalian anda : Rp " + kembalian
+                                        simpanTransaksiCSV(tgl_sekarang, "Pemasukan", denda, "denda keterlambatan buku oleh " + username)
+                                        
+                                        FOR EACH b IN data_buku DO
+                                            IF b.id == id_buku THEN
+                                                b.stock_baca = b.stock_baca + 1
+                                                simpanDataBuku(data_buku)
+                                            END IF
+                                        END FOR
+                                        
+                                        FOR EACH u IN data_user DO
+                                            IF u.username == username THEN
+                                                DECLARE idx2: INTEGER = 0
+                                                FOR EACH b IN u.buku_dipinjam DO
+                                                    IF b.id == id_buku THEN
+                                                        REMOVE u.buku_dipinjam[idx2]
+                                                        BREAK
+                                                    END IF
+                                                    idx2 = idx2 + 1
+                                                END FOR
+                                                u.denda = 0.0
+                                                simpanDataUser(data_user)
+                                                BREAK
+                                            END IF
+                                        END FOR
+                                        
+                                        PRINT "berhasil mengembalikan buku"
+                                        kembalikan_buku = FALSE
+                                        BREAK
+                                    ELSE
+                                        PRINT "Jumlah pembayaran kurang. Silahkan coba lagi."
+                                    END IF
+                                END WHILE
+                            ELSE
+                                FOR EACH u IN data_user DO
+                                    IF u.username == username THEN
+                                        u.denda = u.denda + denda
+                                        simpanDataUser(data_user)
+                                        BREAK
+                                    END IF
+                                END FOR
+                            END IF
+                            
+                            PRINT "Silahkan bayar denda anda saat mengembalikan buku berikutnya."
+                            kembalikan_buku = FALSE
+                        END IF
+                    END IF
+                END FOR
+            END IF
+        END FOR
+    END WHILE
+    
+    PRINT "(tekan Enter untuk lanjut)"
+    READ
+    updateDataUser(data_user)
+    updateDataBuku(data_buku)
+END PROCEDURE
+
+PROCEDURE beliBuku(REF data_buku: VECTOR OF Buku, username: STRING)
+    DECLARE id_buku: INTEGER
+    DECLARE pembayaran: DOUBLE
+    DECLARE kembalian: DOUBLE
+    DECLARE pemasukan: DOUBLE
+    DECLARE judul: STRING
+    DECLARE data: JSON
+    DECLARE sekarang: TIME = CURRENT_TIME()
+    DECLARE tgl_sekarang: STRING = FORMAT_DATE(sekarang, "%d-%m-%Y")
+    
+    bersihkanLayar()
+    updateDataBuku(data_buku)
+    
+    PRINT "==================== Daftar Buku ====================="
+    PRINT "------------------------------------------------------"
+    
+    FOR EACH buku IN data_buku DO
+        PRINT "[" + buku.id + "] " + buku.judul
+        PRINT "    Author : " + buku.author
+        PRINT "    Stock  : " + buku.stock_jual
+        PRINT "    Harga  : " + buku.harga
+        PRINT "------------------------------------------------------"
+    END FOR
+    
+    PRINT "==========================================================="
+    PRINT "Input id buku yang ingin dibeli : "
+    
+    DO
+        READ id_buku
+    WHILE (id_buku < 1 OR id_buku > LENGTH(data_buku))
+    
+    FOR EACH buku IN data_buku DO
+        IF buku.id == id_buku THEN
+            IF buku.stock_jual > 0 THEN
+                PRINT "Harga buku = Rp " + buku.harga
+                
+                WHILE TRUE DO
+                    PRINT "Masukan jumlah pembayaran : Rp "
+                    READ pembayaran
+                    
+                    IF pembayaran >= buku.harga THEN
+                        kembalian = pembayaran - buku.harga
+                        pemasukan = buku.harga
+                        judul = buku.judul
+                        PRINT "Kembalian anda = Rp " + kembalian
+                        buku.stock_jual = buku.stock_jual - 1
+                        simpanDataBuku(data_buku)
+                        BREAK
+                    ELSE
+                        PRINT "Jumlah pembayaran kuran. Silahkan coba kembali."
+                    END IF
+                END WHILE
+            ELSE
+                PRINT "Maaf stock buku kosong"
+                RETURN
+            END IF
+            BREAK
+        END IF
+    END FOR
+    
+    PRINT "Berhasil membeli buku !"
+    PRINT "(tekan Enter untuk lanjut)"
+    READ
+    READ
+    bersihkanLayar()
+    updateDataBuku(data_buku)
+    simpanTransaksiCSV(tgl_sekarang, "Penjualan", pemasukan, "Buku " + judul + " dibeli oleh " + username)
+END PROCEDURE
+
+PROCEDURE simpanTransaksiCSV(tanggal: STRING, kategori: STRING, jumlah: DOUBLE, deskripsi: STRING)
+    DECLARE file: FILE = OPEN_APPEND("laporan_keuangan.csv")
+    
+    IF NOT file.is_open() THEN
+        PRINT "Gagal membuka file CSV"
+        RETURN
+    END IF
+    
+    WRITE_LINE file: NEWLINE + tanggal + "," + kategori + "," + jumlah + "," + deskripsi + ","
+    CLOSE file
+END PROCEDURE

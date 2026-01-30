@@ -1,0 +1,32 @@
+{
+    "User": [
+        {
+            "buku_dipinjam": [],
+            "denda": 0.0,
+            "password": "admin123",
+            "role": "admin",
+            "username": "admin"
+        },
+        {
+            "buku_dipinjam": [],
+            "denda": 0.0,
+            "password": "user123",
+            "role": "user",
+            "username": "user1"
+        },
+        {
+            "buku_dipinjam": [],
+            "denda": 0.0,
+            "password": "12345678",
+            "role": "user",
+            "username": "user2"
+        },
+        {
+            "buku_dipinjam": [],
+            "denda": 0.0,
+            "password": "25552011213",
+            "role": "user",
+            "username": "rizky"
+        }
+    ]
+}

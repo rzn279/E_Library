@@ -1,0 +1,48 @@
+{
+    "Buku": [
+        {
+            "author": "James Clear",
+            "harga": 120000.0,
+            "id": 1,
+            "isbn": "978-602-06-3318-3",
+            "judul": "Atomic Habits",
+            "path": "/buku/Atomic_Habits.pdf",
+            "stock_baca": 4,
+            "stock_jual": 10,
+            "tahun": 2018
+        },
+        {
+            "author": "Carol S. Dweck",
+            "harga": 100000.0,
+            "id": 2,
+            "isbn": "978-1-47213-996-2",
+            "judul": "Mindset",
+            "path": "/buku/Mindset.pdf",
+            "stock_baca": 2,
+            "stock_jual": 5,
+            "tahun": 2006
+        },
+        {
+            "author": "Brian Ward",
+            "harga": 110000.0,
+            "id": 3,
+            "isbn": "978-0-7432-7356-5",
+            "judul": "How Linux Works",
+            "path": "/buku/How_Linux_Works.pdf",
+            "stock_baca": 1,
+            "stock_jual": 3,
+            "tahun": 2014
+        },
+        {
+            "author": "Bjarne Stroustrup",
+            "harga": 120000.0,
+            "id": 4,
+            "isbn": "978-1921681001",
+            "judul": "Programming Principle",
+            "path": "/buku/Programming_Principle.pdf",
+            "stock_baca": 2,
+            "stock_jual": 4,
+            "tahun": 2003
+        }
+    ]
+}
